@@ -1,0 +1,25 @@
+{
+  "name": "speedpack-express-website-backend",
+  "version": "1.0.0",
+  "description": "Backend for the dashboard on the Speedpack Express Website",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/John-Vazquez/Speedpack-Express-Website-Backend.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/John-Vazquez/Speedpack-Express-Website-Backend/issues"
+  },
+  "homepage": "https://github.com/John-Vazquez/Speedpack-Express-Website-Backend#readme",
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
+
