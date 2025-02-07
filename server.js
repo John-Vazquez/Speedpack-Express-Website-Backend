@@ -1,7 +1,10 @@
 const express = require('express');
+const cors = require('cors');
+
 const app = express();  // ✅ Ensuring app is defined
 const port = process.env.PORT || 3000;
 
+app.use(cors());
 app.use(express.json());
 
 let jobLogs = []; // Temporary storage, replace with a database later
