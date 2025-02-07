@@ -1,15 +1,22 @@
-const express = require('express');
-const app = express();
-const port = process.env.PORT || 3000;
+const fs = require('fs');
+const path = require('path');
 
-app.use(express.json());
+const LOG_FILE = path.join(__dirname, 'jobLogs.json');
 
-let jobLogs = []; // Temporary storage, replace with a database later
+// Load logs from file (if exists)
+let jobLogs = [];
+if (fs.existsSync(LOG_FILE)) {
+    jobLogs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf-8'));
+}
 
 // Endpoint to log a job
 app.post('/api/log-job', (req, res) => {
     const jobData = req.body;
     jobLogs.push(jobData);
+    
+    // Save to file
+    fs.writeFileSync(LOG_FILE, JSON.stringify(jobLogs, null, 2));
+
     res.status(201).json({ message: "Job logged successfully" });
 });
 
@@ -21,8 +28,4 @@ app.get('/api/search', (req, res) => {
     }
     const results = jobLogs.filter(log => log.jobNumber === jobNumber);
     res.json(results);
-});
-
-app.listen(port, () => {
-    console.log(`Backend running on port ${port}`);
 });
