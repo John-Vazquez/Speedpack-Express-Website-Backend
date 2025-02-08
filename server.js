@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 
-const app = express();  // ✅ Ensuring app is defined
+const app = express();  
 const port = process.env.PORT || 3000;
 
 app.use(cors());
@@ -14,7 +14,7 @@ app.get('/', (req, res) => {
     res.send("Speedpack Express Backend is running!");
 });
 
-// Endpoint to log a job
+// ✅ Endpoint to log a job
 app.post('/api/log-job', (req, res) => {
     const jobData = req.body;
     if (!jobData.jobNumber || !jobData.dateTime || !jobData.status) {
@@ -24,7 +24,12 @@ app.post('/api/log-job', (req, res) => {
     res.status(201).json({ message: "Job logged successfully" });
 });
 
-// Endpoint to search jobs by job number
+// ✅ Endpoint to get all logs (for dashboard)
+app.get('/api/logs', (req, res) => {
+    res.json(jobLogs);
+});
+
+// ✅ Endpoint to search jobs by job number
 app.get('/api/search', (req, res) => {
     const { jobNumber } = req.query;
     if (!jobNumber) {
@@ -34,7 +39,7 @@ app.get('/api/search', (req, res) => {
     res.json(results);
 });
 
-// Start the server
+// ✅ Start the server
 app.listen(port, () => {
     console.log(`Backend running on port ${port}`);
 });
