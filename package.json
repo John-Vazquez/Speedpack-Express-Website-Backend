@@ -20,6 +20,7 @@
   "homepage": "https://github.com/John-Vazquez/Speedpack-Express-Website-Backend#readme",
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "pg": "^8.13.3"
   }
 }
