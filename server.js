@@ -10,13 +10,15 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Create a PostgreSQL pool using the DATABASE_URL environment variable.
-// Make sure DATABASE_URL is set in Render to your external PostgreSQL URL.
+// Add ssl config to fix "SSL/TLS required" error
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
-// Temporary storage for live upload logs (this resets on server restart)
+// Temporary storage for live upload logs (resets on server restart)
 let jobLogs = [];
 
 // Root route
@@ -25,26 +27,22 @@ app.get('/', (req, res) => {
 });
 
 // ------------------------------------------------------------------
-// UPDATED /api/log-job endpoint:
-// This endpoint logs a job in the temporary live logs array
-// and, if a "category" is provided, updates performance_stats in PostgreSQL.
+// POST /api/log-job
+// Logs a job and updates performance_stats if a category is provided
 // ------------------------------------------------------------------
 app.post('/api/log-job', async (req, res) => {
   try {
     const jobData = req.body;
 
-    // Validate required fields: jobNumber, dateTime, and status
     if (!jobData.jobNumber || !jobData.dateTime || !jobData.status) {
       return res.status(400).json({ error: "Missing required job data" });
     }
 
-    // Add job to live logs (these logs are temporary and reset on server restart)
+    // Add job to the in-memory array
     jobLogs.push(jobData);
 
-    // If a category is provided, update the performance_stats table in the database.
-    // This happens automatically—no need for you to check in Postman manually.
+    // If category is given, update performance_stats in PostgreSQL
     if (jobData.category) {
-      // If the job status is "success" (case-insensitive), increment successful count.
       if (jobData.status.toLowerCase() === 'success') {
         await pool.query(
           `INSERT INTO performance_stats (category, successful_uploads, failed_uploads)
@@ -54,7 +52,6 @@ app.post('/api/log-job', async (req, res) => {
           [jobData.category]
         );
       } else {
-        // Otherwise, increment the failed count.
         await pool.query(
           `INSERT INTO performance_stats (category, successful_uploads, failed_uploads)
            VALUES ($1, 0, 1)
@@ -73,8 +70,8 @@ app.post('/api/log-job', async (req, res) => {
 });
 
 // ------------------------------------------------------------------
-// PERFORMANCE STATS ENDPOINTS:
-// - GET /api/performance-stats returns the data from the performance_stats table.
+// GET /api/performance-stats
+// Returns all rows from the performance_stats table
 // ------------------------------------------------------------------
 app.get('/api/performance-stats', async (req, res) => {
   try {
@@ -87,7 +84,7 @@ app.get('/api/performance-stats', async (req, res) => {
 });
 
 // ------------------------------------------------------------------
-// LIVE UPLOAD STATS ENDPOINTS (temporary in-memory storage)
+// LIVE UPLOAD STATS ENDPOINTS (in-memory, not permanent)
 // ------------------------------------------------------------------
 app.get('/api/logs', (req, res) => {
   res.json(jobLogs);
