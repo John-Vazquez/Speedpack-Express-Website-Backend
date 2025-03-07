@@ -8,58 +8,64 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// ======= LIVE UPLOAD STATS (In-Memory) =======
+// ----------------------
+// CONNECT TO POSTGRES
+// ----------------------
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL // Make sure this is set in Render
+});
 
-// This in-memory array holds job logs for your live upload stats.
-// Note: In a production app, you'd persist this data.
+// Temporary storage for live upload logs (still used by GET /api/logs)
 let jobLogs = [];
 
-// Root route
-app.get('/', (req, res) => {
-  res.send("Speedpack Express Backend is running!");
-});
+// ----------------------
+// AUTOMATICALLY UPDATE performance_stats WHEN A JOB IS LOGGED
+// ----------------------
+app.post('/api/log-job', async (req, res) => {
+  try {
+    const jobData = req.body;
+    
+    // 1) Validate required fields for the live logs
+    if (!jobData.jobNumber || !jobData.dateTime || !jobData.status) {
+      return res.status(400).json({ error: "Missing required job data" });
+    }
+    // 2) Store in memory array (existing behavior)
+    jobLogs.push(jobData);
 
-// Endpoint to log a job (live upload stats)
-app.post('/api/log-job', (req, res) => {
-  const jobData = req.body;
-  if (!jobData.jobNumber || !jobData.dateTime || !jobData.status) {
-    return res.status(400).json({ error: "Missing required job data" });
+    // 3) Also update performance_stats IF a category is provided
+    if (jobData.category) {
+      if (jobData.status.toLowerCase() === 'success') {
+        // Increment successful_uploads by 1 for that category
+        await pool.query(
+          `INSERT INTO performance_stats (category, successful_uploads, failed_uploads)
+           VALUES ($1, 1, 0)
+           ON CONFLICT (category)
+           DO UPDATE SET successful_uploads = performance_stats.successful_uploads + 1`,
+          [jobData.category]
+        );
+      } else {
+        // Increment failed_uploads by 1 for that category
+        await pool.query(
+          `INSERT INTO performance_stats (category, successful_uploads, failed_uploads)
+           VALUES ($1, 0, 1)
+           ON CONFLICT (category)
+           DO UPDATE SET failed_uploads = performance_stats.failed_uploads + 1`,
+          [jobData.category]
+        );
+      }
+    }
+
+    res.status(201).json({ message: "Job logged successfully" });
+  } catch (error) {
+    console.error("Error in log-job:", error);
+    res.status(500).json({ error: "Server error" });
   }
-  jobLogs.push(jobData);
-  res.status(201).json({ message: "Job logged successfully" });
 });
 
-// Endpoint to get all live job logs
-app.get('/api/logs', (req, res) => {
-  res.json(jobLogs);
-});
-
-// Endpoint to search jobs by job number
-app.get('/api/search', (req, res) => {
-  const { jobNumber } = req.query;
-  if (!jobNumber) {
-    return res.status(400).json({ error: 'jobNumber query parameter is required' });
-  }
-  const results = jobLogs.filter(log => log.jobNumber === jobNumber);
-  res.json(results);
-});
-
-// ======= PERFORMANCE STATS (Using PostgreSQL) =======
-
-// Initialize the Postgres pool only if DATABASE_URL is set.
-// On Render, ensure DATABASE_URL is set to your External Database URL.
-let pool;
-if (process.env.DATABASE_URL) {
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL
-  });
-}
-
-// Endpoint to update performance stats for a given category
+// ----------------------
+// PERFORMANCE STATS ENDPOINTS
+// ----------------------
 app.post('/api/update-performance-stats', async (req, res) => {
-  if (!pool) {
-    return res.status(500).json({ error: "Database not configured" });
-  }
   const { category, successful_uploads, failed_uploads } = req.body;
   if (!category) {
     return res.status(400).json({ error: "Category is required" });
@@ -80,11 +86,7 @@ app.post('/api/update-performance-stats', async (req, res) => {
   }
 });
 
-// Endpoint to retrieve all performance stats
 app.get('/api/performance-stats', async (req, res) => {
-  if (!pool) {
-    return res.status(500).json({ error: "Database not configured" });
-  }
   try {
     const result = await pool.query('SELECT * FROM performance_stats');
     res.json(result.rows);
@@ -94,6 +96,30 @@ app.get('/api/performance-stats', async (req, res) => {
   }
 });
 
+// ----------------------
+// LIVE UPLOAD STATS ENDPOINTS
+// ----------------------
+app.get('/api/logs', (req, res) => {
+  res.json(jobLogs);
+});
+
+app.get('/api/search', (req, res) => {
+  const { jobNumber } = req.query;
+  if (!jobNumber) {
+    return res.status(400).json({ error: 'jobNumber query parameter is required' });
+  }
+  const results = jobLogs.filter(log => log.jobNumber === jobNumber);
+  res.json(results);
+});
+
+// Root route
+app.get('/', (req, res) => {
+  res.send("Speedpack Express Backend is running!");
+});
+
+// ----------------------
+// START THE SERVER
+// ----------------------
 app.listen(port, () => {
   console.log(`Backend running on port ${port}`);
 });
